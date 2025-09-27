@@ -1,0 +1,34 @@
+version: "3.9"
+
+volumes:
+  heimdall_config:
+    driver: local
+    driver_opts:
+      type: "nfs"
+      o: "addr=${NAS_ADDR},vers=4.2,rw"
+      device: ":${NAS_EXPORT}"
+
+services:
+  heimdall:
+    image: lscr.io/linuxserver/heimdall:latest
+    env_file:
+      - .env
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - heimdall_config:/config
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.zone == ${PLACEMENT_ZONE}
+      restart_policy:
+        condition: any
+      labels:
+        - traefik.enable=true
+        
+        - traefik.http.routers.heimdall.rule=Host(`${HEIMDALL_HOST}`)
+        - traefik.http.routers.heimdall.entrypoints=web
+        - traefik.http.services.heimdall.loadbalancer.server.port=80

@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - --providers.docker.swarmMode=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --api.dashboard=true
+
+      # Let's Encrypt (HTTP-01)
+      - --certificatesresolvers.le.acme.email=${LE_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${LETSENCRYPT_VOL}:/letsencrypt
+    deploy:
+      placement:
+        constraints:
+          - ${PLACEMENT_CONSTRAINT}
+      labels:
+        - traefik.enable=true
+        # LAN-only dashboard
+        - traefik.http.routers.traefik.rule=Host(`traefik.lan`)
+        - traefik.http.routers.traefik.entrypoints=web
+        - traefik.http.services.traefik.loadbalancer.server.port=8080
+
+volumes:
+  ${LETSENCRYPT_VOL}:
+    driver: local
